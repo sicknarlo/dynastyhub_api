@@ -1,8 +1,37 @@
 {
   "name": "dynastyhub_api",
   "version": "1.0.0",
-  "main": "index.js",
-  "license": "MIT",
+  "scripts": {
+    "start": "nodemon",
+    "tsc:w": "tsc -w",
+    "lint": "tslint server/**/*.ts --fix",
+    "test": "mocha",
+    "build": "tsc -p ./prod.tsconfig.json && ncp './server' './dist'",
+    "test:coverage": "nyc mocha"
+  },
+  "nyc": {
+    "extension": [
+      ".ts"
+    ],
+    "include": [
+      "server/**/*.ts"
+    ],
+    "require": [
+      "ts-node/register",
+      "source-map-support/register"
+    ],
+    "exclude": [
+      "server/**/*.d.ts",
+      "server/tests/**/*.ts"
+    ],
+    "reporter": [
+      "html"
+    ],
+    "check-coverage": "--lines 50 --per-file",
+    "all": false,
+    "sourceMap": false,
+    "instrument": true
+  },
   "dependencies": {
     "@types/body-parser": "^1.17.0",
     "@types/chai": "^4.1.3",
@@ -12,6 +41,7 @@
     "@types/mocha": "^5.2.1",
     "@types/mongoose": "^5.0.15",
     "@types/node": "^10.3.1",
+    "axios": "^0.18.0",
     "body-parser": "^1.18.3",
     "chai": "^4.1.2",
     "chai-http": "^4.0.0",
