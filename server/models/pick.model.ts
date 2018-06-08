@@ -28,10 +28,7 @@ const schema: Schema = new Schema({
   type: String,
   pick: Number,
   date: Date,
-  uniqueId: {
-    type: String,
-    unique: true,
-  },
+  uniqueId: String,
 });
 
 schema.statics.seedPickDB = async () => {
