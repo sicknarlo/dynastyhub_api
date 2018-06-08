@@ -8,3 +8,4 @@ coverage
 dist
 .nyc_output
 .env
+.env.production
