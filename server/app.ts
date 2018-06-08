@@ -3,6 +3,7 @@ import { json, urlencoded } from 'body-parser';
 import * as http from 'http';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { Pick } from './models/pick.model';
 import AppRouter from './routes/router';
 
 dotenv.config();
@@ -36,6 +37,16 @@ app.use((err: Error & { status: number }, request: express.Request, response: ex
 });
 
 app.use(AppRouter);
+
+const CronJob = require('cron').CronJob;
+new CronJob({
+  cronTime: '* * 3 * * *',
+  onTick: () => {
+    () => Pick.updateDLFPicks();
+  },
+  start: true,
+  timeZone: 'America/New_York',
+});
 
 const server: http.Server = app.listen(process.env.PORT || 3000);
 

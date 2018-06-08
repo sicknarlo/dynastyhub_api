@@ -3,5 +3,5 @@ export default (data) => {
     return sum + value;
   }, 0);
 
-  return sum / data.length;
+  return Number((sum / data.length).toFixed(2));
 }

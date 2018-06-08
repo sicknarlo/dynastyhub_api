@@ -90,24 +90,41 @@ schema.statics.seedPickDB = async () => {
 }
 
 schema.statics.updateDLFPicks = async () => {
-  const PICK_LIMIT = 240;
   let picksAdded = 0;
+  let completedLeagues = await redisGetAsync('parsedLeagues');
+  if (completedLeagues) completedLeagues = JSON.parse(completedLeagues);
+  if (!completedLeagues) completedLeagues = {};
+
+  const players = await Player.find();
+  const playerMap = players.reduce((acc, el) => {
+    acc[el.mflId] = el;
+    return acc;
+  }, {});
 
   // Get all DLF mocks
   const dlfLeagueResponse = await axios.get('https://www72.myfantasyleague.com/2018/export?TYPE=leagueSearch&SEARCH=dynasty mock&JSON=1');
-  const dlfLeaguesToParse = dlfLeagueResponse.data.leagues.league;
+  const dlfLeaguesToParse = dlfLeagueResponse.data.leagues.league.reduce((acc, el) => {
+    if (!completedLeagues[el.id]) acc.push(el);
+    return acc;
+  }, []);
+  console.log(dlfLeaguesToParse.length);
 
   for (var i=0; i< dlfLeaguesToParse.length; i++) {
     const league = dlfLeaguesToParse[i];
     const leagueId = league.id;
+    console.log(leagueId);
     const draftResultsResponse = await axios.get(`https://www62.myfantasyleague.com/2018/export?TYPE=draftResults&L=${leagueId}&APIKEY=&JSON=1`);
     const picks = draftResultsResponse.data.draftResults.draftUnit.draftPick;
+    let leagueUsed = completedLeagues[leagueId] || false;
+    if (leagueUsed) continue;
+    if (picks[picks.length - 1].timestamp !== '') completedLeagues[leagueId] = true;
     for (var y=0; y<picks.length; y++) {
       const pick = picks[y];
       if (pick.timestamp && pick.timestamp !== '') {
         const uniqueId = `2018${leagueId}${pick.timestamp}${pick.franchise}${pick.player}`;
         const existingPick = await Pick.findOne({ uniqueId });
         if (!existingPick) {
+          console.log(pick);
           const newPick = new Pick();
           newPick.source = 'mfl';
           newPick.leagueId = leagueId;
@@ -116,12 +133,13 @@ schema.statics.updateDLFPicks = async () => {
           newPick.pick = (12 * (Number(pick.round) - 1)) + Number(pick.pick);
           newPick.date = new Date(Number(pick.timestamp) * 1000);
           newPick.uniqueId = uniqueId;
-          let playerMatch = await Player.findOne({ mflId: pick.player });
+          let playerMatch = playerMap[pick.player];
           if (!playerMatch) {
             const mflPlayer = await axios.get(`https://www72.myfantasyleague.com/2018/export?TYPE=players&DETAILS=1&SINCE=&PLAYERS=${pick.player}&JSON=1`);
             if (mflPlayer.data.players.player) {
               playerMatch = Player.createPlayerFromMFLPlayer(mflPlayer.data.players.player);
               playerMatch = await playerMatch.save();
+              playerMap[pick.player] = playerMatch;
             }
           }
           newPick._playerId = playerMatch._id;
@@ -131,6 +149,7 @@ schema.statics.updateDLFPicks = async () => {
       }
     }
   }
+  await redisSetAsync('parsedLeagues', JSON.stringify(completedLeagues));
   return picksAdded;
 }
 
