@@ -39,6 +39,7 @@ export interface IPlayer extends Document {
 
 export interface IPlayerModel extends Model<IPlayer> {
   updatePlayersFromMFL(): Promise<{ nAdded: number, nUpdated: number }>
+  createPlayerFromMFLPlayer({}): IPlayer
 }
 
 const schema: Schema = new Schema({
@@ -67,6 +68,35 @@ const schema: Schema = new Schema({
   updatedAt: Date,
   status: String,
 })
+
+schema.statics.createPlayerFromMFLPlayer = (mflPlayer) => {
+  const player = new Player();
+  player.draftYear = mflPlayer.draft_year && Number(mflPlayer.draft_year);
+  player.draftRound = mflPlayer.draft_round && Number(mflPlayer.draft_round);
+  player.nflId = mflPlayer.nfl_id;
+  player.rotoworldId = mflPlayer.rotoworld_id;
+  player.statsId = mflPlayer.stats_id;
+  player.position = mflPlayer.position;
+  player.statsGlobalId = mflPlayer.stats_global_id;
+  player.espnId = mflPlayer.espn_id;
+  player.kfflId = mflPlayer.kffl_id;
+  player.weight = mflPlayer.weight && Number(mflPlayer.weight);
+  player.mflId = mflPlayer.id;
+  player.birthdate = mflPlayer.birthdate && new Date(Number(mflPlayer.birthdate) * 1000);
+  player.draftTeam = mflPlayer.draft_team;
+  player.name = mflPlayer.name && `${normalizeName(mflPlayer.name.split(', ')[1])} ${normalizeName(mflPlayer.name.split(', ')[0])}`;
+  player.draftPick = mflPlayer.draft_pick && Number(mflPlayer.draft_pick);
+  player.college = mflPlayer.college;
+  player.height = mflPlayer.height && Number(mflPlayer.height);
+  player.jersey = mflPlayer.jersey;
+  player.twitterUsername = mflPlayer.twitter_username;
+  player.sportsdataId = mflPlayer.sportsdata_id;
+  player.team = mflPlayer.team;
+  player.cbsId = mflPlayer.cbs_id;
+  player.updatedAt = new Date();
+  player.status = mflPlayer.status === 'R' ? 'rookie' : 'active';
+  return player;
+}
 
 schema.statics.updatePlayersFromMFL = async (): Promise<{ nAdded: number, nUpdated: number }> => {
   const MFL_URI = 'https://www75.myfantasyleague.com/2018/export?TYPE=players&DETAILS=1&SINCE=&PLAYERS=&JSON=1';
