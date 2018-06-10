@@ -24,4 +24,13 @@ adpRouter.get('/adp/byPlayer/:_playerId', asyncMiddleWare(async(request: Request
   }));
 }));
 
+adpRouter.get('/adp/byPlayerName/:name', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  return response.json(await ADPController.getADPForPlayerByName({
+    name: request.params.name,
+    type: request.query.type,
+    format: request.query.format,
+    date: request.query.date
+  }));
+}));
+
 export default adpRouter;

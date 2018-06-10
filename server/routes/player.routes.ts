@@ -31,4 +31,8 @@ playerRouter.get('/seedPickDB', asyncMiddleWare(async(request: Request, response
   return response.json(await Pick.seedPickDB());
 }));
 
+playerRouter.get('/seedPicks', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  return response.json(await PlayerController.seedPicks());
+}));
+
 export default playerRouter;
