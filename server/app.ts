@@ -47,12 +47,12 @@ new CronJob({
     () => Pick.updateDLFPicks();
     () => Rank.getRanksFromMfl();
     Pick.aggregate([
-      { "$group": {
-          "_id": "$uniqueId",
-          "dups": { "$push": "$_id" },
-          "count": { "$sum": 1 }
+      { '$group': {
+          '_id': '$uniqueId',
+          'dups': { '$push': '$_id' },
+          'count': { '$sum': 1 }
       }},
-      { "$match": { "count": { "$gt": 1 } }}
+      { '$match': { 'count': { '$gt': 1 } }}
     ]).then(x => {
       x.forEach(y => {
         const array = y;
