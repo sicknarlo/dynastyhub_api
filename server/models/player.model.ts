@@ -153,7 +153,7 @@ schema.statics.updatePlayersFromMFL = async (): Promise<{ nAdded: number, nUpdat
     player.save();
   });
   players.forEach((player) => {
-    player.status = 'inactive';
+    player.status = player.position === 'PICK' && Number(player.draftYear) < 2018 ? 'inactive' : 'PICK';
     player.save();
   });
   return response;

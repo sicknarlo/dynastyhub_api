@@ -1,10 +1,11 @@
 import { Request, Response, Router } from 'express';
 import playerRouter from './player.routes';
 import adpRouter from './adp.routes';
+import calculatorRouter from './calculator.routes';
 
 const VERSION: string = 'v1';
 
-const ROUTES: Array<Router> = [playerRouter, adpRouter];
+const ROUTES: Array<Router> = [playerRouter, adpRouter, calculatorRouter];
 
 const AppRouter: Router = Router();
 

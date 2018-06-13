@@ -3,8 +3,10 @@ import { json, urlencoded } from 'body-parser';
 import * as http from 'http';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import * as cors from 'cors';
 import { Rank } from './models/rank.model'
 import { Pick } from './models/pick.model';
+import { Player } from './models/player.model';
 import AppRouter from './routes/router';
 import { News } from './models/news.model';
 
@@ -12,6 +14,7 @@ dotenv.config();
 const app = express();
 
 app.use(json());
+app.use(cors());
 app.use(urlencoded({
   extended: true
 }));
@@ -44,7 +47,8 @@ const CronJob = require('cron').CronJob;
 new CronJob({
   cronTime: '* * 3 * * 3',
   onTick: () => {
-    () => Pick.updateDLFPicks();
+    () => Player.updatePlayersFromMFL();
+    // () => Pick.updateDLFPicks();
     () => Rank.getRanksFromMfl();
     Pick.aggregate([
       { '$group': {

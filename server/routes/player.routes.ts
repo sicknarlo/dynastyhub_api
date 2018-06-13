@@ -13,7 +13,11 @@ playerRouter.get('/player/ping', asyncMiddleWare(async(request: Request, respons
 }));
 
 playerRouter.get('/player', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
-  return response.json(await PlayerController.getAllPlayers());
+  return response.json(await PlayerController.getAllPlayers({ fields: request.query.fields.split(',') }));
+}));
+
+playerRouter.get('/playerList', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  return response.json(await PlayerController.getMainPlayerList());
 }));
 
 playerRouter.get('/player/:_id', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
@@ -50,6 +54,10 @@ playerRouter.get('/seedPicks', asyncMiddleWare(async(request: Request, response:
 
 playerRouter.get('/getRanksFromMFL', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
   return response.json(await Rank.getRanksFromMfl());
+}));
+
+playerRouter.get('/seedPickDB/:leagueId', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  return response.json(await Pick.importLeaguePicks(request.params.leagueId, Number(request.query.year)));
 }));
 
 export default playerRouter;
