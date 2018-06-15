@@ -1,8 +1,9 @@
+import * as moment from 'moment';
 import { Player, IPlayer } from '../models/player.model';
 import { Pick } from '../models/pick.model';
 import { Rank } from '../models/rank.model';
-import { excludedPositions } from '../constants';
-import { average, adpToSuperflex, median, standardDeviation } from '../utils';
+import { includedPositions } from '../constants';
+import { average, adpToSuperflex, median, standardDeviation, runningADP } from '../utils';
 import { redisGetAsync, redisSetAsync } from '../config/database';
 
 export class PlayerController {
@@ -11,13 +12,13 @@ export class PlayerController {
       acc[el] = 1;
       return acc;
     }, {}) : null;
-    const players = await Player.find({ status: { $ne: 'inactive' }, position: { $nin: excludedPositions }}, queryFields);
+    const players = await Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions }}, queryFields);
     return players;
   }
   async getMainPlayerList(): Promise<Array<any>> {
-    const cachedResponse = await redisGetAsync('mainPlayerList');
-    if (cachedResponse) return JSON.parse(cachedResponse);
-    const players = await Player.find({ status: { $ne: 'inactive' }, position: { $nin: excludedPositions }}).lean();
+    // const cachedResponse = await redisGetAsync('mainPlayerList');
+    // if (cachedResponse) return JSON.parse(cachedResponse);
+    const players = await Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions }}).lean();
     const playerIds = [];
     const playerMap = players.reduce((acc, el) => {
       playerIds.push(el._id);
@@ -25,7 +26,7 @@ export class PlayerController {
       return acc;
     }, {});
     const minDateObj = new Date();
-    minDateObj.setMonth(minDateObj.getMonth() - 1);
+    minDateObj.setMonth(minDateObj.getMonth() - 3);
     const picks = await Pick.aggregate(
 
       // Pipeline
@@ -33,11 +34,11 @@ export class PlayerController {
         // Stage 1
         {
           $match: {
-              $and: [
-                { date: { $lte: new Date() }},
-                { date: { $gte: minDateObj }}
-              ],
-              _playerId: { $in: playerIds }
+            $and: [
+              { date: { $lte: new Date() }},
+              { date: { $gte: minDateObj }}
+            ],
+            _playerId: { $in: playerIds }
           }
         },
 
@@ -46,56 +47,12 @@ export class PlayerController {
           $group: {
             _id: "$_playerId",
             picks: { $push: "$$ROOT" },
-            pickValues: { $push: '$pick' },
-            avg: { $avg: "$pick" },
-            stdev: { $stdDevPop: "$pick" },
-            numberOfPicks: { $sum: 1 }
           }
         },
       ]
     );
     const picksMap = picks.reduce((acc, el) => {
-      acc[el._id] = el;
-      return acc;
-    }, {});
-    minDateObj.setMonth(minDateObj.getMonth() - 3)
-    const lastMonthFinish = new Date();
-    lastMonthFinish.setMonth(lastMonthFinish.getMonth() - 2);
-    const fullPicks = await Pick.aggregate(
-
-      // Pipeline
-      [
-        // Stage 1
-        {
-          $match: {
-              $and: [
-                { date: { $lte: new Date() }},
-                { date: { $gte: minDateObj }}
-              ],
-              _playerId: { $in: playerIds }
-          }
-        },
-
-        // Stage 2
-        {
-          $group: {
-            _id: "$_playerId",
-            picks: { $push: "$$ROOT" },
-            pickValues: { $push: '$pick' },
-          }
-        },
-
-      ]
-
-      // Created with Studio 3T, the IDE for MongoDB - https://studio3t.com/
-
-    );
-
-    const adp3MonthsAgo = {};
-
-    const fullPickMap = fullPicks.reduce((acc, el) => {
-      acc[el._id] = el.pickValues;
-      adp3MonthsAgo[el._id] = average(el.picks.filter(x => x.date < lastMonthFinish).map(x => x.pick));
+      acc[el._id] = el.picks;
       return acc;
     }, {});
 
@@ -107,8 +64,8 @@ export class PlayerController {
         {
           $match: {
               $and: [
-                { date: { $lte: new Date() }},
-                { date: { $gte: minDateObj }}
+                { date: { $lte: moment().toDate() }},
+                { date: { $gte: moment().subtract(14, 'days').toDate() }}
               ],
               _playerId: { $in: playerIds }
           }
@@ -131,10 +88,8 @@ export class PlayerController {
       acc[el._id] = el.ranks;
       return acc;
     }, {});
-    const response = players.map((x) => {
-      const pick = picksMap[x._id];
-      const pickValues = pick ? pick.pickValues : [];
-      while (pickValues < 5) pickValues.push(241);
+    const response = players.filter(x => picksMap[x._id] && picksMap[x._id].length).map((x) => {
+      const picks = picksMap[x._id] || [];
       const playerWithFixins = {
         _id: x._id,
         name: x.name,
@@ -142,23 +97,13 @@ export class PlayerController {
         birthdate: x.birthdate,
         team: x.team,
         position: x.position,
-        adp: {
-          avg: average(pickValues),
-          median: median(pickValues),
-          min: Math.min.apply(null, pickValues),
-          max: Math.max.apply(null, pickValues),
-          stdev: standardDeviation(pickValues),
-          picks: x.picks,
-          fullPicks: fullPickMap[x._id],
-          trend: adp3MonthsAgo[x._id] ? Number((average(pickValues) - adp3MonthsAgo[x._id]).toFixed(2)) : 0,
-        },
+        picks: picks,
         rank: x.position === 'PICK' ? null : {
-          avg: 300,
-          min: 300,
-          max: 300,
-          stdev: 0
+          avg: null,
+          min: null,
+          max: null,
+          stdev: null
         },
-        opportunity: 0,
       }
       const rankMatch = rankMap[x._id];
       if (rankMatch) {
@@ -166,13 +111,10 @@ export class PlayerController {
           ...rankMatch[rankMatch.length - 1],
         }
       }
-      playerWithFixins.opportunity = playerWithFixins.adp.avg && playerWithFixins.rank && playerWithFixins.rank.avg
-        ? Number((playerWithFixins.adp.avg - playerWithFixins.rank.avg).toFixed(2))
-        : 0;
       return playerWithFixins
-    }).sort((a, b) => a.adp.avg - b.adp.avg);
+    });
 
-    redisSetAsync('mainPlayerList', JSON.stringify(response), 'EX', 10);
+    redisSetAsync('mainPlayerList', JSON.stringify(response));
     return response;
   }
   async getPlayerById(_id): Promise<IPlayer> {

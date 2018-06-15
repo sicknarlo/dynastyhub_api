@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { request } from 'http';
 import ADPController from '../controllers/adp.controller';
 import { ADP, getLeagueList } from '../models/adp.model';
+import { Pick } from '../models/pick.model';
 import asyncMiddleWare from '../utils/asyncMiddleware';
 
 const adpRouter: Router = Router();
@@ -31,6 +32,10 @@ adpRouter.get('/adp/byPlayerName/:name', asyncMiddleWare(async(request: Request,
     format: request.query.format,
     date: request.query.date
   }));
+}));
+
+adpRouter.get('/pickCount', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  return response.json(await Pick.find().count());
 }));
 
 export default adpRouter;

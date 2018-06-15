@@ -7,3 +7,6 @@ export { default as standardDeviation } from './standardDeviation';
 export { default as value } from './value';
 export { default as valueToRank } from './valueToRank';
 export { default as parseStringAsync } from './parseStringAsync';
+export { default as runningAverages } from './runningAverages';
+export { default as runningADP } from './runningADP';
+

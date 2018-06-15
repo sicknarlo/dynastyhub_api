@@ -4,11 +4,13 @@ import * as http from 'http';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as cors from 'cors';
+import { redisDelAsync } from './config/database';
 import { Rank } from './models/rank.model'
 import { Pick } from './models/pick.model';
 import { Player } from './models/player.model';
 import AppRouter from './routes/router';
 import { News } from './models/news.model';
+import PlayerController from './controllers/player.controller';
 
 dotenv.config();
 const app = express();
@@ -46,11 +48,11 @@ app.use(AppRouter);
 const CronJob = require('cron').CronJob;
 new CronJob({
   cronTime: '* * 3 * * 3',
-  onTick: () => {
-    () => Player.updatePlayersFromMFL();
-    // () => Pick.updateDLFPicks();
-    () => Rank.getRanksFromMfl();
-    Pick.aggregate([
+  onTick: async () => {
+    await Player.updatePlayersFromMFL();
+//     // () => Pick.updateDLFPicks();
+    await Rank.getRanksFromMfl();
+    await Pick.aggregate([
       { '$group': {
           '_id': '$uniqueId',
           'dups': { '$push': '$_id' },
@@ -64,19 +66,24 @@ new CronJob({
         Pick.remove({ _id: { $in: y.dups }}).then(x => console.log(x));
       })
     });
+    await redisDelAsync('mainPlayerList');
+    await PlayerController.getMainPlayerList();
   },
   start: true,
   timeZone: 'America/New_York',
 })
 
 new CronJob({
-  cronTime: '* * 12 * * *',
-  onTick: () => {
+  cronTime: '0 0 18 * * *',
+  onTick: async () => {
     News.getRotoworldNews().then(x => console.log('added news items:', x));
     News.getDlfNews().then(x => console.log('added news items:', x));
+    await redisDelAsync('mainPlayerList');
+    await PlayerController.getMainPlayerList();
   },
   start: true,
   timeZone: 'America/New_York',
+
 })
 
 const server: http.Server = app.listen(process.env.PORT || 3000);

@@ -1,13 +1,17 @@
+import * as moment from 'moment';
 import { Player, IPlayer } from '../models/player.model';
 import { Pick } from '../models/pick.model';
 import { Rank } from '../models/rank.model';
-import { value } from '../utils';
+import { News } from '../models/news.model';
+import { value, runningADP } from '../utils';
 import { redisGetAsync, redisSetAsync } from '../config/database';
 
 export class CalculatorController {
   async getPlayersForCalculator({ team1, team2 }): Promise<{ fullTeam1: Array<any>, fullTeam2: Array<any> }> {
     const minDateObj = new Date();
     minDateObj.setMonth(minDateObj.getMonth() - 6);
+    const newsDate = new Date();
+    newsDate.setMonth(newsDate.getMonth() - 2);
     const data = await Promise.all([
       await Player.find({
         _id: { $in: team1.concat(team2) }
@@ -20,7 +24,7 @@ export class CalculatorController {
         {
           $match: {
             $and: [
-              { date: { $gte: minDateObj }}
+              { date: { $gte: moment().subtract(14, 'days') }}
             ],
             _playerId: { $in: team1.concat(team2) }
           }
@@ -31,11 +35,16 @@ export class CalculatorController {
             ranks: { $push: "$$ROOT" },
           }
         },
-      ])
+      ]),
+      await News.find({
+        players: { $in: team1.concat(team2) },
+        date: { $gte: newsDate },
+      }).lean(),
     ])
     const players = data[0];
     const picks = data[1];
     const ranks = data[2];
+    const news = data[3];
     const picksMap = picks.reduce((acc, el) => {
       if (!acc[el._playerId]) acc[el._playerId] = [];
       acc[el._playerId].push(el);
@@ -45,13 +54,22 @@ export class CalculatorController {
       acc[el._id] = el.ranks;
       return acc;
     }, {});
+    const newsMap = news.reduce((acc, el) => {
+      el.players.forEach(player => {
+        if (!acc[player]) acc[player] = [];
+        acc[player].push(el);
+      });
+      return acc
+    }, {});
     const fullPlayers = players.reduce((acc, el) => {
       const picks = picksMap[el._id];
       const ranks = ranksMap[el._id];
+      const news = newsMap[el._id];
       acc[el._id] = {
         ...el,
-        picks: picks ? picks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
+        adps: runningADP(picks),
         ranks: ranks ? ranks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
+        news: news ? news.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
       }
       return acc;
     }, {});

@@ -3,6 +3,7 @@ import { request } from 'http';
 import { Player } from '../models/player.model';
 import { Pick } from '../models/pick.model';
 import { Rank } from '../models/rank.model';
+import { News } from '../models/news.model';
 import PlayerController from '../controllers/player.controller';
 import asyncMiddleWare from '../utils/asyncMiddleware';
 
@@ -45,7 +46,8 @@ playerRouter.get('/updateDLFPicks', asyncMiddleWare(async(request: Request, resp
 }));
 
 playerRouter.get('/seedPickDB', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
-  return response.json(await Pick.seedPickDB());
+  Pick.seedPickDB();
+  return response.json('running');
 }));
 
 playerRouter.get('/seedPicks', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
@@ -58,6 +60,13 @@ playerRouter.get('/getRanksFromMFL', asyncMiddleWare(async(request: Request, res
 
 playerRouter.get('/seedPickDB/:leagueId', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
   return response.json(await Pick.importLeaguePicks(request.params.leagueId, Number(request.query.year)));
+}));
+
+playerRouter.get('/updateNews', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  let nAdded = 0;
+  nAdded += await News.getRotoworldNews();
+  nAdded += await News.getDlfNews();
+  return response.json(nAdded);
 }));
 
 export default playerRouter;
