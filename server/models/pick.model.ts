@@ -1,11 +1,13 @@
 import { Document, Model, Schema } from 'mongoose';
 import axios from 'axios';
+import * as moment from 'moment';
 import average from '../utils/average';
 import value from '../utils/value';
 import expectedValue from '../utils/expectedValue';
 import valueToRank from '../utils/valueToRank';
 import adpToSuperflex from '../utils/adpToSuperflex';
 import median from '../utils/median';
+import getRandomInt from '../utils/getRandomInt';
 import { Player } from './player.model';
 import { mongoose, redisGetAsync, redisSetAsync } from '../config/database';
 
@@ -222,9 +224,19 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
         await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
         continue;
       }
+      let randomInt = getRandomInt(10);
       for (var y=0; y<picks.length; y++) {
         const pick = picks[y];
         if (pick.timestamp && pick.timestamp !== '' && pick.comments !== 'No players available from current ADP results' && pick.comments !== 'Pick made by ADP Rank' && pick.player !== '0000') {
+          let newDate = type === 'mock'
+            ? moment(Number(pick.timestamp) * 1000).add(randomInt, 'days')
+            : moment(Number(pick.timestamp) * 1000);
+          while (moment().diff(newDate) < 0) {
+            randomInt = getRandomInt(10);
+            newDate = type === 'mock'
+              ? moment(Number(pick.timestamp) * 1000).add(randomInt, 'days')
+              : moment(Number(pick.timestamp) * 1000);
+          }
           const uniqueId = `${year}${leagueId}${pick.timestamp}${pick.franchise}${pick.player}`;
           const newPick = new Pick();
           newPick.source = 'mfl';
@@ -232,7 +244,9 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
           newPick.format = 'ppr';
           newPick.type = type;
           newPick.pick = (12 * (Number(pick.round) - 1)) + Number(pick.pick);
-          newPick.date = new Date(Number(pick.timestamp) * 1000);
+          newPick.date = type === 'mock'
+            ? moment(Number(pick.timestamp) * 1000).add(randomInt, 'days').toDate()
+            : new Date(Number(pick.timestamp) * 1000);
           newPick.uniqueId = uniqueId;
           let playerMatch = playerMap[pick.player];
           if (!playerMatch) {

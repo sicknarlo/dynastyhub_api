@@ -4,6 +4,7 @@ import { Player } from '../models/player.model';
 import { Pick } from '../models/pick.model';
 import { Rank } from '../models/rank.model';
 import { News } from '../models/news.model';
+import { RealTrade } from '../models/real-trade.model';
 import PlayerController from '../controllers/player.controller';
 import asyncMiddleWare from '../utils/asyncMiddleware';
 
@@ -23,17 +24,7 @@ playerRouter.get('/playerList', asyncMiddleWare(async(request: Request, response
 
 playerRouter.get('/player/:_id', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
   // Get player
-  const player = await PlayerController.getPlayerById(request.params._id);
-  if (request.query.full && request.query.format) {
-    const adp = await PlayerController.getAdpForPlayer({ player, format: request.query.format });
-    const rank = await PlayerController.getRankForPlayer({ player, format: request.query.format });
-    const opportunity = Number((adp.avg - rank.avg).toFixed(2));
-    return response.json(Object.assign({
-      adp,
-      rank,
-      opportunity,
-    }, player));
-  }
+  const player = await PlayerController.getFullPlayer(request.params._id);
   return response.json(player);
 }));
 
@@ -67,6 +58,11 @@ playerRouter.get('/updateNews', asyncMiddleWare(async(request: Request, response
   nAdded += await News.getRotoworldNews();
   nAdded += await News.getDlfNews();
   return response.json(nAdded);
+}));
+
+playerRouter.get('/getTrades', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  RealTrade.getTradesFromMFL();
+  return response.json('running');
 }));
 
 export default playerRouter;

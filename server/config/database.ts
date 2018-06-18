@@ -2,17 +2,21 @@ import * as mongoose from 'mongoose';
 import * as dotenv from 'dotenv';
 import * as redis from 'redis';
 import * as util from 'util';
+import * as cachegoose from 'cachegoose';
 
 dotenv.config();
 
 (mongoose as any).Promise = global.Promise;
 
-
-const redisClient = redis.createClient({
+const redisConfig = {
   host: process.env.REDIS_HOST,
   password: process.env.REDIS_KEY,
   port: process.env.REDIS_PORT
-});
+}
+
+cachegoose(mongoose, redisConfig);
+
+const redisClient = redis.createClient(redisConfig);
 
 export const redisGetAsync = util.promisify(redisClient.get).bind(redisClient);
 export const redisSetAsync = util.promisify(redisClient.set).bind(redisClient);

@@ -4,10 +4,13 @@ import * as http from 'http';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as cors from 'cors';
+import { getRandomInt } from './utils';
+import * as moment from 'moment';
 import { redisDelAsync } from './config/database';
 import { Rank } from './models/rank.model'
 import { Pick } from './models/pick.model';
 import { Player } from './models/player.model';
+import { RealTrade } from './models/real-trade.model';
 import AppRouter from './routes/router';
 import { News } from './models/news.model';
 import PlayerController from './controllers/player.controller';
@@ -52,6 +55,8 @@ new CronJob({
     await Player.updatePlayersFromMFL();
 //     // () => Pick.updateDLFPicks();
     await Rank.getRanksFromMfl();
+    await Pick.updatePicks();
+    await RealTrade.getTradesFromMFL();
     await Pick.aggregate([
       { '$group': {
           '_id': '$uniqueId',
@@ -85,6 +90,29 @@ new CronJob({
   timeZone: 'America/New_York',
 
 })
+
+const leagueInts = {};
+
+// const foo = async () => {
+//   const cursor = Pick.find({ type: 'mock' }).cursor();
+//   cursor.on('data', function(doc) {
+//     let leagueInt = leagueInts[(doc as any).leagueId];
+//     if (!leagueInt) {
+//       leagueInt = getRandomInt(15);
+//       leagueInts[(doc as any).leagueId] = leagueInt;
+//     }
+//     const date = new Date((doc as any).date);
+//     const newDate = moment(date).add(leagueInt, 'days');
+//     (doc as any).date = newDate.toDate();
+//     (doc as any).save().then(() => console.log((doc as any)._id, leagueInt));
+//   });
+//   cursor.on('close', function() {
+//     // Called when done
+//     console.log('done');
+//   });
+// };
+
+// foo();
 
 const server: http.Server = app.listen(process.env.PORT || 3000);
 

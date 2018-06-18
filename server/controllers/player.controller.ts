@@ -2,6 +2,8 @@ import * as moment from 'moment';
 import { Player, IPlayer } from '../models/player.model';
 import { Pick } from '../models/pick.model';
 import { Rank } from '../models/rank.model';
+import { News } from '../models/news.model';
+import { RealTrade } from '../models/real-trade.model';
 import { includedPositions } from '../constants';
 import { average, adpToSuperflex, median, standardDeviation, runningADP } from '../utils';
 import { redisGetAsync, redisSetAsync } from '../config/database';
@@ -15,10 +17,26 @@ export class PlayerController {
     const players = await Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions }}, queryFields);
     return players;
   }
+  async getFullPlayer(_playerId) {
+    const basePlayer = await Player.findOne({ _id: _playerId }).lean();
+    const picks = await Pick.find({ _playerId, date: { $gte: moment().subtract(8, 'months')} }).lean();
+    const ranks = await Rank.find({ _playerId, date: { $gte: moment().subtract(8, 'months')} }).lean();
+    const news = await News.find({ players: _playerId }).lean();
+    const trades = await RealTrade.find({ $or: [ { team1: _playerId }, { team2: _playerId }], date: { $gte: moment().subtract(90, 'days') } });
+    return {
+      ...basePlayer,
+      picks: picks.filter(x => moment().diff(moment(x.date), 'days') > -1).sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
+      ranks: ranks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
+      news: news.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
+      trades,
+    }
+  }
   async getMainPlayerList(): Promise<Array<any>> {
-    // const cachedResponse = await redisGetAsync('mainPlayerList');
-    // if (cachedResponse) return JSON.parse(cachedResponse);
-    const players = await Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions }}).lean();
+    const cachedResponse = await redisGetAsync('mainPlayerList');
+    if (cachedResponse) return JSON.parse(cachedResponse);
+    console.time('players')
+    const players = await (Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions }}).lean() as any);
+    console.timeEnd('players')
     const playerIds = [];
     const playerMap = players.reduce((acc, el) => {
       playerIds.push(el._id);
@@ -27,7 +45,8 @@ export class PlayerController {
     }, {});
     const minDateObj = new Date();
     minDateObj.setMonth(minDateObj.getMonth() - 3);
-    const picks = await Pick.aggregate(
+    console.time('picks')
+    const picks = await (Pick.aggregate(
 
       // Pipeline
       [
@@ -50,12 +69,13 @@ export class PlayerController {
           }
         },
       ]
-    );
+    ) as any);
+    console.timeEnd('picks')
     const picksMap = picks.reduce((acc, el) => {
       acc[el._id] = el.picks;
       return acc;
     }, {});
-
+    console.time('ranks')
     const ranks = await Rank.aggregate(
 
       // Pipeline
@@ -84,10 +104,12 @@ export class PlayerController {
       // Created with Studio 3T, the IDE for MongoDB - https://studio3t.com/
 
     );
+    console.timeEnd('ranks')
     const rankMap = ranks.reduce((acc, el) => {
       acc[el._id] = el.ranks;
       return acc;
     }, {});
+    console.time('parse')
     const response = players.filter(x => picksMap[x._id] && picksMap[x._id].length).map((x) => {
       const picks = picksMap[x._id] || [];
       const playerWithFixins = {
@@ -114,7 +136,8 @@ export class PlayerController {
       return playerWithFixins
     });
 
-    redisSetAsync('mainPlayerList', JSON.stringify(response));
+    redisSetAsync('mainPlayerList', JSON.stringify(response), 'EX', 8600);
+    console.timeEnd('parse')
     return response;
   }
   async getPlayerById(_id): Promise<IPlayer> {
