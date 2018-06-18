@@ -5,11 +5,12 @@ import { Rank } from '../models/rank.model';
 import { News } from '../models/news.model';
 import { value, runningADP } from '../utils';
 import { redisGetAsync, redisSetAsync } from '../config/database';
+import { RealTrade } from '../models/real-trade.model';
 
 export class CalculatorController {
   async getPlayersForCalculator({ team1, team2 }): Promise<{ fullTeam1: Array<any>, fullTeam2: Array<any> }> {
     const minDateObj = new Date();
-    minDateObj.setMonth(minDateObj.getMonth() - 6);
+    minDateObj.setMonth(minDateObj.getMonth() - 3);
     const newsDate = new Date();
     newsDate.setMonth(newsDate.getMonth() - 2);
     const data = await Promise.all([
@@ -40,11 +41,25 @@ export class CalculatorController {
         players: { $in: team1.concat(team2) },
         date: { $gte: newsDate },
       }).lean(),
+      await RealTrade.aggregate([
+        {
+          $match: {
+            _playerId: { $in: team1.concat(team2) }
+          }
+        },
+        {
+          $group: {
+            _id: "$_playerId",
+            trades: { $push: "$$ROOT" },
+          }
+        },
+      ]),
     ])
     const players = data[0];
     const picks = data[1];
     const ranks = data[2];
     const news = data[3];
+    const trades = data[4];
     const picksMap = picks.reduce((acc, el) => {
       if (!acc[el._playerId]) acc[el._playerId] = [];
       acc[el._playerId].push(el);
@@ -61,15 +76,21 @@ export class CalculatorController {
       });
       return acc
     }, {});
+    const tradesMap = trades.reduce((acc, el) => {
+      acc[el._id] = el.trades;
+      return acc;
+    }, {});
     const fullPlayers = players.reduce((acc, el) => {
       const picks = picksMap[el._id];
       const ranks = ranksMap[el._id];
       const news = newsMap[el._id];
+      const trades = tradesMap[el._id];
       acc[el._id] = {
         ...el,
         adps: runningADP(picks),
         ranks: ranks ? ranks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
         news: news ? news.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
+        trades: trades ? trades.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
       }
       return acc;
     }, {});
