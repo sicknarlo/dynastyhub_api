@@ -2,10 +2,11 @@ import { Request, Response, Router } from 'express';
 import playerRouter from './player.routes';
 import adpRouter from './adp.routes';
 import calculatorRouter from './calculator.routes';
+import newsRouter from './news.routes';
 
 const VERSION: string = 'v1';
 
-const ROUTES: Array<Router> = [playerRouter, adpRouter, calculatorRouter];
+const ROUTES: Array<Router> = [playerRouter, adpRouter, calculatorRouter, newsRouter];
 
 const AppRouter: Router = Router();
 
