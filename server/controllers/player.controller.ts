@@ -18,18 +18,22 @@ export class PlayerController {
     return players;
   }
   async getFullPlayer(_playerId) {
+    const cachedPlayer = await redisGetAsync(`player-${_playerId}`);
+    if (cachedPlayer) return JSON.parse(cachedPlayer);
     const basePlayer = await Player.findOne({ _id: _playerId }).lean();
     const picks = await Pick.find({ _playerId, date: { $gte: moment().subtract(8, 'months')} }).lean();
     const ranks = await Rank.find({ _playerId, date: { $gte: moment().subtract(8, 'months')} }).lean();
     const news = await News.find({ players: _playerId }).lean();
     const trades = await RealTrade.find({ $or: [ { team1: _playerId }, { team2: _playerId }], date: { $gte: moment().subtract(90, 'days') } });
-    return {
+    const player = {
       ...basePlayer,
       picks: picks.filter(x => moment().diff(moment(x.date), 'days') > -1).sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
       ranks: ranks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
       news: news.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
       trades,
     }
+    redisSetAsync(`player-${_playerId}`, JSON.stringify(player), 'EX', 8600);
+    return player;
   }
   async getMainPlayerList(): Promise<Array<any>> {
     const cachedResponse = await redisGetAsync('mainPlayerList');
