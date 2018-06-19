@@ -183,21 +183,29 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
   // let rookieAverages = [];
   // let leagues = {};
 
-  if (!leagues) leagues = {};
-  if (!rookieAverages) rookieAverages = [];
+  // if (!leagues) leagues = {};
+  // if (!rookieAverages) rookieAverages = [...Array(48)].map(e => Array(0));
+  // leagues = {};
+  // rookieAverages = [...Array(48)].map(e => Array(0));
   const validLeagues = leaguesToParse.filter(x => !leagues[x.id] && !leagues[x.id] === true);
   for (var i=0; i< validLeagues.length; i++) {
     const league = validLeagues[i];
     const leagueId = league.id;
-    console.log(year, type, i+1, validLeagues.length)
+    console.log(year, type, i+1, leagueId, validLeagues.length)
     try {
       if (leagues[leagueId] === true) continue;
       const rookies = [];
       // Get league settings
-      if (type !== 'mock') {
-        const leagueSettingsReponse = await axios.get(`http://www53.myfantasyleague.com/${year}/export?TYPE=league&L=${leagueId}&APIKEY=&JSON=1`);
-        const leagueSettings = leagueSettingsReponse.data.league;
+      const leagueSettingsReponse = await axios.get(`http://www53.myfantasyleague.com/${year}/export?TYPE=league&L=${leagueId}&APIKEY=&JSON=1`);
+      const leagueSettings = leagueSettingsReponse.data.league;
+      console.log(leagueSettings && leagueSettings.starters &&
+          leagueSettings.starters.position)
+      const isSuper = leagueSettings && leagueSettings.starters &&
+        leagueSettings.starters.position &&
+        leagueSettings.starters.position.find(x => x.name === 'QB') &&
+        leagueSettings.starters.position.find(x => x.name === 'QB').limit !== '1';
 
+      if (type !== 'mock') {
         // Check if this is a league we want to parse, we only want startup
         if (leagueSettings && leagueSettings.history && leagueSettings.history.league && leagueSettings.history.league.length > 1) {
           let flag = false;
@@ -206,7 +214,7 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
           })
           if (flag) {
             leagues[leagueId] = true;
-            await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+            // await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
             continue;
           }
         }
@@ -216,15 +224,16 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
       const bulkPicks = []
       if (!picks) {
         if (year < CURRENT_YEAR) leagues[leagueId] = true
-        await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+        // await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
         continue;
       }
       if (picks[picks.length - 1].timestamp === '') {
         if (year < CURRENT_YEAR) leagues[leagueId] = true
-        await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+        // await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
         continue;
       }
       let randomInt = getRandomInt(10);
+      const playerMatches = [];
       for (var y=0; y<picks.length; y++) {
         const pick = picks[y];
         if (pick.timestamp && pick.timestamp !== '' && pick.comments !== 'No players available from current ADP results' && pick.comments !== 'Pick made by ADP Rank' && pick.player !== '0000') {
@@ -241,7 +250,7 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
           const newPick = new Pick();
           newPick.source = 'mfl';
           newPick.leagueId = leagueId;
-          newPick.format = 'ppr';
+          newPick.format = isSuper ? 'super' : 'ppr';
           newPick.type = type;
           newPick.pick = (12 * (Number(pick.round) - 1)) + Number(pick.pick);
           newPick.date = type === 'mock'
@@ -260,11 +269,17 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
           if (playerMatch) {
             newPick._playerId = playerMatch._id;
             bulkPicks.push(newPick);
+            playerMatches.push(playerMatch);
             if (playerMatch.draftYear && Number(playerMatch.draftYear) === year) {
               rookies.push({ pick: newPick.pick, timestamp: pick.timestamp });
             }
           }
         }
+      }
+      if (playerMatches[0].draftYear === year && playerMatches[1].draftYear === year && playerMatches[2].draftYear === year) {
+        leagues[leagueId] = true;
+        // await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+        continue;
       }
       if (rookies.length > 0) {
         while (rookies.length < 48) {
@@ -272,48 +287,53 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
         };
         rookies.splice(48, rookies.length - 1);
         rookies.forEach((x, i) => {
-          if (!rookieAverages[i]) rookieAverages[i] = [];
+          // if (!rookieAverages[i]) rookieAverages[i] = [];
           rookieAverages[i].push(x.pick);
-          if (rookieAverages[i].length > 100) rookieAverages[i].shift();
+          if (rookieAverages[i].length > 50) rookieAverages[i].shift();
         });
         rookieAverages = rookieAverages.sort((a, b) => median(a) - median(b))
 
+        console.log(rookieAverages.map(x => median(x)))
+
         const rookiePicks = [].concat(
           // rookie picks
-          await valuesIntoRookiePicks({ year, values: rookies, leagueId, playerMap, type: 'startup' }),
+          await valuesIntoRookiePicks({ year, values: rookies, leagueId, playerMap, type, isSuper}),
           // rookie picks converted to values, adjusted, then back to picks
           await valuesIntoRookiePicks({
             year: year + 1,
             values: rookieAverages.map((x, i) => ({ pick: Math.ceil(valueToRank(value(median(x)) * 0.85)), timestamp: rookies[i].timestamp })),
             leagueId,
             playerMap,
-            type: 'startup'
+            type,
+            isSuper
           }),
           await valuesIntoRookiePicks({
             year: year + 2,
-            values: rookieAverages.map((x, i) => ({ pick: Math.ceil(valueToRank(value(median(x)) * 0.80)), timestamp: rookies[i].timestamp })),
-            leagueId,
-            playerMap,
-            type: 'startup'
-          }),
-          await valuesIntoRookiePicks({
-            year: year + 3,
             values: rookieAverages.map((x, i) => ({ pick: Math.ceil(valueToRank(value(median(x)) * 0.75)), timestamp: rookies[i].timestamp })),
             leagueId,
             playerMap,
-            type: 'startup'
+            type,
+            isSuper
+          }),
+          await valuesIntoRookiePicks({
+            year: year + 3,
+            values: rookieAverages.map((x, i) => ({ pick: Math.ceil(valueToRank(value(median(x)) * 0.7)), timestamp: rookies[i].timestamp })),
+            leagueId,
+            playerMap,
+            type,
+            isSuper
           }),
         )
         bulkPicks.length && await Pick.collection.insert(bulkPicks.concat(rookiePicks));
         leagues[leagueId] = true;
-        await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
-        await redisSetAsync('rookieAverages', JSON.stringify(rookieAverages));
+        // await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+        // await redisSetAsync('rookieAverages', JSON.stringify(rookieAverages));
         picksAdded += bulkPicks.length;
       } else {
         bulkPicks.length && await Pick.collection.insert(bulkPicks);
         leagues[leagueId] = true;
-        await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
-        await redisSetAsync('rookieAverages', JSON.stringify(rookieAverages));
+        // await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+        // await redisSetAsync('rookieAverages', JSON.stringify(rookieAverages));
         picksAdded += bulkPicks.length;
       }
     } catch(e) {
@@ -322,6 +342,8 @@ const processPicks = async ({ leaguesToParse, year, type, players, playerMap }) 
       await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
     }
   }
+  await redisSetAsync('parsedLeaguesObj', JSON.stringify(leagues));
+  await redisSetAsync('rookieAverages', JSON.stringify(rookieAverages));
   return picksAdded;
 }
 
@@ -397,7 +419,7 @@ schema.statics.seedPickDB = async () => {
   }
 }
 
-const valuesIntoRookiePicks = async ({ year, values, leagueId, playerMap, type }) => {
+const valuesIntoRookiePicks = async ({ year, values, leagueId, playerMap, type, isSuper }) => {
   const picks: Array<IPick> = [];
   // Base picks (Year Pick N)
   for (var i=0; i<values.length; i++) {
@@ -417,7 +439,7 @@ const valuesIntoRookiePicks = async ({ year, values, leagueId, playerMap, type }
     picks.push(new Pick({
       source: 'mfl',
       leagueId: leagueId,
-      format: 'ppr',
+      format: isSuper ? 'super' : 'ppr',
       type,
       pick: value.pick,
       date: new Date(Number(value.timestamp) * 1000),

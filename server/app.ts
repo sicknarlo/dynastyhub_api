@@ -91,6 +91,8 @@ new CronJob({
 
 })
 
+// Pick.updatePicks();
+
 const leagueInts = {};
 
 // const foo = async () => {

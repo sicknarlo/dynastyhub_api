@@ -21,76 +21,47 @@ export class CalculatorController {
         _playerId: { $in: team1.concat(team2) },
         date: { $gte: minDateObj },
       }).lean(),
-      await Rank.aggregate([
-        {
-          $match: {
-            $and: [
-              { date: { $gte: moment().subtract(14, 'days') }}
-            ],
-            _playerId: { $in: team1.concat(team2) }
-          }
-        },
-        {
-          $group: {
-            _id: "$_playerId",
-            ranks: { $push: "$$ROOT" },
-          }
-        },
-      ]),
+      await Rank.find({
+        date: { $gte: moment().subtract(14, 'days').toDate() },
+        _playerId: { $in: team1.concat(team2) }
+      }).lean(),
       await News.find({
         players: { $in: team1.concat(team2) },
         date: { $gte: newsDate },
       }).lean(),
-      await RealTrade.aggregate([
-        {
-          $match: {
-            _playerId: { $in: team1.concat(team2) }
-          }
-        },
-        {
-          $group: {
-            _id: "$_playerId",
-            trades: { $push: "$$ROOT" },
-          }
-        },
-      ]),
     ])
     const players = data[0];
     const picks = data[1];
     const ranks = data[2];
     const news = data[3];
-    const trades = data[4];
     const picksMap = picks.reduce((acc, el) => {
       if (!acc[el._playerId]) acc[el._playerId] = [];
       acc[el._playerId].push(el);
       return acc;
     }, {});
     const ranksMap = ranks.reduce((acc, el) => {
-      acc[el._id] = el.ranks;
+      if (!acc[el._playerId]) acc[el._playerId] = [];
+      acc[el._playerId].push(el);
       return acc;
     }, {});
     const newsMap = news.reduce((acc, el) => {
-      el.players.forEach(player => {
+      el.players && el.players.forEach(player => {
         if (!acc[player]) acc[player] = [];
         acc[player].push(el);
       });
       return acc
     }, {});
-    const tradesMap = trades.reduce((acc, el) => {
-      acc[el._id] = el.trades;
-      return acc;
-    }, {});
+
     const fullPlayers = players.reduce((acc, el) => {
       const picks = picksMap[el._id];
       const ranks = ranksMap[el._id];
       const news = newsMap[el._id];
-      const trades = tradesMap[el._id];
       acc[el._id] = {
         ...el,
         adps: runningADP(picks),
+        picks,
         ranks: ranks ? ranks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
         news: news ? news.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
-        trades: trades ? trades.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1) : [],
       }
       return acc;
     }, {});
