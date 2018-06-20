@@ -13,6 +13,7 @@ import { Player } from './models/player.model';
 import { RealTrade } from './models/real-trade.model';
 import AppRouter from './routes/router';
 import { News } from './models/news.model';
+import { ADP } from './models/adp.model';
 import PlayerController from './controllers/player.controller';
 
 dotenv.config();
@@ -50,7 +51,7 @@ app.use(AppRouter);
 
 const CronJob = require('cron').CronJob;
 new CronJob({
-  cronTime: '* * 3 * * 3',
+  cronTime: '* * 3 * * */2',
   onTick: async () => {
     await Player.updatePlayersFromMFL();
 //     // () => Pick.updateDLFPicks();
@@ -79,7 +80,16 @@ new CronJob({
 })
 
 new CronJob({
-  cronTime: '0 0 18 * * *',
+  cronTime: '* * 3 * * 3',
+  onTick: async () => {
+    await ADP.updateADPFromFFC();
+  },
+  start: true,
+  timeZone: 'America/New_York',
+})
+
+new CronJob({
+  cronTime: '0 0 */3 * * *',
   onTick: async () => {
     News.getRotoworldNews().then(x => console.log('added news items:', x));
     News.getDlfNews().then(x => console.log('added news items:', x));

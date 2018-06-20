@@ -2,13 +2,13 @@ import { Document, Model, Schema } from 'mongoose';
 import axios from 'axios';
 import { mongoose } from '../config/database';
 
-const normalizeName = (name: string): string => name.replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, '')
+export const normalizeName = (name: string): string => name ?name.replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, '')
     .replace('II', '')
     .replace('III', '')
     .replace('IV', '')
     .replace('Jr', '')
     .replace('Sr', '')
-    .trim()
+    .trim() : name;
 
 export interface IPlayer extends Document {
   draftYear: number;

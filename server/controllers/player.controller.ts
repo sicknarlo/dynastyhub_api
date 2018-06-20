@@ -3,6 +3,7 @@ import { Player, IPlayer } from '../models/player.model';
 import { Pick } from '../models/pick.model';
 import { Rank } from '../models/rank.model';
 import { News } from '../models/news.model';
+import { ADP } from '../models/adp.model';
 import { RealTrade } from '../models/real-trade.model';
 import { includedPositions } from '../constants';
 import { average, adpToSuperflex, median, standardDeviation, runningADP } from '../utils';
@@ -18,19 +19,21 @@ export class PlayerController {
     return players;
   }
   async getFullPlayer(_playerId) {
-    const cachedPlayer = await redisGetAsync(`player-${_playerId}`);
-    if (cachedPlayer) return JSON.parse(cachedPlayer);
+    // const cachedPlayer = await redisGetAsync(`player-${_playerId}`);
+    // if (cachedPlayer) return JSON.parse(cachedPlayer);
     const basePlayer = await Player.findOne({ _id: _playerId }).lean();
-    const picks = await Pick.find({ _playerId, date: { $gte: moment().subtract(8, 'months')} }).lean();
-    const ranks = await Rank.find({ _playerId, date: { $gte: moment().subtract(8, 'months')} }).lean();
+    const picks = await Pick.find({ _playerId, date: { $gte: moment().subtract(8, 'months').toDate() }}).lean();
+    const ranks = await Rank.find({ _playerId, date: { $gte: moment().subtract(8, 'months').toDate() }}).lean();
     const news = await News.find({ players: _playerId }).lean();
     const trades = await RealTrade.find({ $or: [ { team1: _playerId }, { team2: _playerId }], date: { $gte: moment().subtract(90, 'days') } });
+    const adps = await ADP.find({ _playerId, date: { $gte: moment().subtract(8, 'months').toDate() }});
     const player = {
       ...basePlayer,
       picks: picks.filter(x => moment().diff(moment(x.date), 'days') > -1).sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
       ranks: ranks.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
       news: news.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1),
       trades,
+      adps: adps.sort((a, b) => new Date(a.date) > new Date(b.date) ? -1 : 1)
     }
     redisSetAsync(`player-${_playerId}`, JSON.stringify(player), 'EX', 8600);
     return player;
