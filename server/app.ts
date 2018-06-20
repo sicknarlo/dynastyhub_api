@@ -83,6 +83,7 @@ new CronJob({
   cronTime: '* * 3 * * 3',
   onTick: async () => {
     await ADP.updateADPFromFFC();
+    console.log('updated adp from ffc');
   },
   start: true,
   timeZone: 'America/New_York',
