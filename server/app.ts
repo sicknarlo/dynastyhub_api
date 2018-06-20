@@ -51,7 +51,7 @@ app.use(AppRouter);
 
 const CronJob = require('cron').CronJob;
 new CronJob({
-  cronTime: '* * 3 * * */2',
+  cronTime: '00 00 3 * * */2',
   onTick: async () => {
     await Player.updatePlayersFromMFL();
 //     // () => Pick.updateDLFPicks();
@@ -80,7 +80,7 @@ new CronJob({
 })
 
 new CronJob({
-  cronTime: '* * 3 * * 3',
+  cronTime: '00 00 3 * * 3',
   onTick: async () => {
     await ADP.updateADPFromFFC();
     console.log('updated adp from ffc');
@@ -90,7 +90,7 @@ new CronJob({
 })
 
 new CronJob({
-  cronTime: '0 0 */3 * * *',
+  cronTime: '00 00 */3 * * *',
   onTick: async () => {
     News.getRotoworldNews().then(x => console.log('added news items:', x));
     News.getDlfNews().then(x => console.log('added news items:', x));
