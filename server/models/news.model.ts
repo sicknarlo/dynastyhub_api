@@ -1,6 +1,7 @@
 import { Document, Model, Schema } from 'mongoose';
 import axios from 'axios';
 import * as FuzzySet from 'fuzzyset.js';
+import { includedPositions } from '../constants';
 import { parseStringAsync } from '../utils';
 import { Player, normalizeName } from './player.model';
 import { mongoose } from '../config/database';
@@ -64,7 +65,7 @@ schema.statics.getNFLNews = async (): Promise<number> => {
   let added = 0;
   const newsResponse = await axios.get(NFL_URI);
   const newsItems = newsResponse.data.news;
-  const players = await Player.find({}, { name: 1, gsisPlayerId: 1});
+  const players = await Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions }}, { name: 1, gsisPlayerId: 1});
   const fuzzySet = FuzzySet();
   const playerMap = players.reduce((acc, el) => {
     acc[el.name] = el._id;
@@ -92,7 +93,7 @@ schema.statics.getNFLNews = async (): Promise<number> => {
         news.body = newsItem.analysis.replace(/<\/?[^>]+(>|$)/g, "");
         news.date = new Date();
         news.uid = `nlf-${newsItem.id}`;
-        news.save().then(x => console.log(x)).catch(x => console.log(x));
+        news.save();
         added++;
         if (!playerMatch.gsisPlayerId) {
           playerMatch.gsisPlayerId = newsItem.gsisPlayerId;
