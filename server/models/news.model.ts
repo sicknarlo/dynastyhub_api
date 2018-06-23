@@ -2,7 +2,7 @@ import { Document, Model, Schema } from 'mongoose';
 import axios from 'axios';
 import * as FuzzySet from 'fuzzyset.js';
 import { parseStringAsync } from '../utils';
-import { Player } from './player.model';
+import { Player, normalizeName } from './player.model';
 import { mongoose } from '../config/database';
 
 export interface INews extends Document {
@@ -18,6 +18,7 @@ export interface INews extends Document {
 export interface INewsModel extends Model<INews> {
   getRotoworldNews(): Promise<number>
   getDlfNews(): Promise<number>
+  getNFLNews(): Promise<number>
 }
 
 const schema: Schema = new Schema({
@@ -56,6 +57,51 @@ schema.statics.getRotoworldNews = async () => {
     }
   }))
   return nAdded;
+}
+
+const NFL_URI = 'http://api.fantasy.nfl.com/v1/players/news?format=json';
+schema.statics.getNFLNews = async (): Promise<number> => {
+  let added = 0;
+  const newsResponse = await axios.get(NFL_URI);
+  const newsItems = newsResponse.data.news;
+  const players = await Player.find({}, { name: 1, gsisPlayerId: 1});
+  const fuzzySet = FuzzySet();
+  const playerMap = players.reduce((acc, el) => {
+    acc[el.name] = el._id;
+    acc[el.gsisPlayerId] = el._id;
+    el.name && fuzzySet.add(el.name);
+    return acc;
+  }, {});
+  await Promise.all(newsItems.map(async(newsItem) => {
+    const dup = await News.findOne({ uid: `nlf-${newsItem.id}`});
+    if (!dup) {
+      let playerMatch = playerMap[newsItem.gsisPlayerId];
+      if (!playerMatch) playerMatch = playerMap[normalizeName(`${newsItem.firstName} ${newsItem.lastName}`)];
+      if (!playerMatch) {
+        const fuzzyMatch = fuzzySet.get(`${newsItem.firstName} ${newsItem.lastName}`);
+        if (fuzzyMatch && fuzzyMatch.length) {
+          playerMatch = playerMap[fuzzyMatch[0][1]];
+        }
+      }
+      if (playerMatch) {
+        const news = new News();
+        news.players = [playerMatch._id];
+        news.site = newsItem.source;
+        news.link = 'www.' + newsItem.source + '.com';
+        news.title = newsItem.body;
+        news.body = newsItem.analysis.replace(/<\/?[^>]+(>|$)/g, "");
+        news.date = new Date();
+        news.uid = `nlf-${newsItem.id}`;
+        news.save().then(x => console.log(x)).catch(x => console.log(x));
+        added++;
+        if (!playerMatch.gsisPlayerId) {
+          playerMatch.gsisPlayerId = newsItem.gsisPlayerId;
+          playerMatch.save();
+        }
+      }
+    }
+  }))
+  return added;
 }
 
 const DLF_URI = 'http://dynastyleaguefootball.com/feed/';

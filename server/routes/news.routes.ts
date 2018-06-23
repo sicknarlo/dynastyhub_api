@@ -13,4 +13,8 @@ adpRouter.get('/news/latest', asyncMiddleWare(async(request: Request, response: 
   return response.json(await News.find({}).sort({ date: -1 }).limit(10));
 }));
 
+adpRouter.get('/news/nflNews', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  return response.json(await News.getNFLNews());
+}));
+
 export default adpRouter;

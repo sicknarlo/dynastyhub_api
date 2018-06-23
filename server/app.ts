@@ -84,6 +84,8 @@ new CronJob({
   onTick: async () => {
     await ADP.updateADPFromFFC();
     console.log('updated adp from ffc');
+    await redisDelAsync('mainPlayerList');
+    await PlayerController.getMainPlayerList();
   },
   start: true,
   timeZone: 'America/New_York',
@@ -94,6 +96,7 @@ new CronJob({
   onTick: async () => {
     News.getRotoworldNews().then(x => console.log('added news items:', x));
     News.getDlfNews().then(x => console.log('added news items:', x));
+    News.getNFLNews().then(x => console.log('added news items:', x));
     await redisDelAsync('mainPlayerList');
     await PlayerController.getMainPlayerList();
   },

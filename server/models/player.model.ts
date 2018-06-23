@@ -37,6 +37,7 @@ export interface IPlayer extends Document {
   status: string;
   yahooId: string;
   fpId: string;
+  gsisPlayerId: string;
 }
 
 export interface IPlayerModel extends Model<IPlayer> {
@@ -71,6 +72,7 @@ const schema: Schema = new Schema({
   status: String,
   yahooId: String,
   fpId: String,
+  gsisPlayerId: String,
 })
 
 schema.statics.createPlayerFromMFLPlayer = (mflPlayer) => {

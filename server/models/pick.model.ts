@@ -367,6 +367,9 @@ schema.statics.updatePicks = async () => {
     // Get all dynasty mocks
     const mockLeagueResponse = await axios.get(`https://www72.myfantasyleague.com/${year}/export?TYPE=leagueSearch&SEARCH=dynasty mock&JSON=1`);
 
+    // Get picks from other identified leagues
+    const otherMockLeagueResponse = await axios.get(`https://www72.myfantasyleague.com/${year}/export?TYPE=leagueSearch&SEARCH=dtc june mock&JSON=1`);
+
     const dynastyLeagues = dynastyLeaguesResponse.data.leagues.league;
 
     console.log('processing', dynastyLeagues.length, 'dynasty leagues from', year)
@@ -380,6 +383,11 @@ schema.statics.updatePicks = async () => {
 
     const mockPicksAdded = await processPicks({ year, type: 'mock', players, playerMap, leaguesToParse: mockLeagues });
     console.log('mock added', mockPicksAdded);
+
+    const otherLeagues = otherMockLeagueResponse.data.leagues.league;
+
+    const otherPicksAdded = await processPicks({ year, type: 'mock', players, playerMap, leaguesToParse: otherLeagues });
+    console.log('other added', otherPicksAdded);
   }
 }
 

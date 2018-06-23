@@ -65,4 +65,9 @@ playerRouter.get('/getTrades', asyncMiddleWare(async(request: Request, response:
   return response.json('running');
 }));
 
+playerRouter.get('/updatePicks', asyncMiddleWare(async(request: Request, response: Response, next: NextFunction) => {
+  Pick.updatePicks();
+  return response.json('running');
+}));
+
 export default playerRouter;
