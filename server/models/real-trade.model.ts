@@ -110,6 +110,8 @@ const processTrades = async ({ leaguesToParse, year, playerMap, trades }) => {
         const mflTrade = tradeData[k];
         const uniqueId = mflTrade.franchise2_gave_up + mflTrade.timestamp + mflTrade.franchise1_gave_up + mflTrade.expires;
         if (trades[uniqueId] === true) continue;
+        const dup = await RealTrade.find({ uniqueId });
+        if (dup) continue;
         const team1Array = mflTrade.franchise1_gave_up && mflTrade.franchise1_gave_up.split(',');
         const team2Array = mflTrade.franchise2_gave_up && mflTrade.franchise2_gave_up.split(',');
         const date = mflTrade.timestamp && new Date(Number(mflTrade.timestamp) * 1000);
@@ -128,7 +130,7 @@ const processTrades = async ({ leaguesToParse, year, playerMap, trades }) => {
 
         await trade.save();
         trades[uniqueId] = true;
-        // await redisSetAsync('parsedTrades', JSON.stringify(trades));
+        await redisSetAsync('parsedTrades', JSON.stringify(trades));
         picksAdded++;
       }
     } catch(e) {

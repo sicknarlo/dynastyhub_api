@@ -72,6 +72,20 @@ new CronJob({
         Pick.remove({ _id: { $in: y.dups }}).then(x => console.log(x));
       })
     });
+    await RealTrade.aggregate([
+      { '$group': {
+          '_id': '$uniqueId',
+          'dups': { '$push': '$_id' },
+          'count': { '$sum': 1 }
+      }},
+      { '$match': { 'count': { '$gt': 1 } }}
+    ]).then(x => {
+      x.forEach(y => {
+        const array = y;
+        y.dups.shift();
+        RealTrade.remove({ _id: { $in: y.dups }}).then(x => console.log(x));
+      })
+    });
     await redisDelAsync('mainPlayerList');
     await PlayerController.getMainPlayerList();
   },
