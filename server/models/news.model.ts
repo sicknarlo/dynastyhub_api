@@ -42,7 +42,7 @@ schema.statics.getRotoworldNews = async () => {
     const existingNewsItem = await News.findOne({ site: 'rotoworld', uid: newsItem.guid[0]._ });
     if (!existingNewsItem) {
       const playerId = newsItem.link[0].split('/')[5];
-      const playerMatch = await Player.findOne({ rotoworldId: playerId });
+      const playerMatch = await Player.findOne({ rotoworldId: playerId, status: { $ne: 'inactive' }, position: { $in: includedPositions } });
       if (playerMatch) {
         const news = new News();
         news.players = [playerMatch._id];
@@ -110,7 +110,7 @@ schema.statics.getDlfNews = async () => {
   let nAdded = 0;
   const newsResponse = await axios.get(DLF_URI);
   const rssJson = await parseStringAsync(newsResponse.data);
-  const players = await Player.find({}, { name: 1 });
+  const players = await Player.find({ status: { $ne: 'inactive' }, position: { $in: includedPositions } }, { name: 1 });
   const fuzzySet = FuzzySet();
   const playerMap = players.reduce((acc, el) => {
     acc[el.name] = el._id;
